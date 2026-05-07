@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>GioKri Monitor</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>GioKri Monitor</h1>
+
+<div id="auth-box">
+
+<h2>Registrazione</h2>
+
+<input type="email" id="reg-email" placeholder="Email">
+<input type="password" id="reg-password" placeholder="Password">
+
+<button onclick="registerUser()">
+Registrati
+</button>
+
+<hr>
+
+<h2>Login</h2>
+
+<input type="email" id="log-email" placeholder="Email">
+<input type="password" id="log-password" placeholder="Password">
+
+<button onclick="loginUser()">
+Accedi
+</button>
+
+</div>
+
+<div id="app" style="display:none;">
+
+<div class="topbar">
+<span id="utente-email"></span>
+
+<button onclick="logoutUser()">
+Esci
+</button>
+</div>
+
+<h2>Nuova Bolletta</h2>
+
+<select id="tipo">
+<option value="Luce">Luce</option>
+<option value="Gas">Gas</option>
+</select>
+
+<input type="month" id="mese">
+
+<input type="number" id="consumi" placeholder="Consumi">
+
+<input type="number" id="importo" placeholder="Importo">
+
+<input type="number" id="tariffa" placeholder="Tariffa">
+
+<input type="number" id="quota" placeholder="Quota fissa">
+
+<input type="text" id="note" placeholder="Note">
+
+<button onclick="salvaBolletta()">
+Salva bolletta
+</button>
+
+<h2>Storico</h2>
+
+<div id="storico"></div>
+
+</div>
+
+</div>
+
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
