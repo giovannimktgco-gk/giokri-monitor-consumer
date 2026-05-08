@@ -46,7 +46,7 @@ async function logoutUser() {
 }
 
 // ======================
-// INIT
+// INIT APP
 // ======================
 
 async function loadApp() {
@@ -209,8 +209,6 @@ function renderDashboard(data) {
   setKPI('kpi-spesa', 'Spesa', statsCurr.totaleSpesa, statsPrev.totaleSpesa, currentKey);
   setKPI('kpi-consumi', 'Consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, currentKey);
   setKPI('kpi-media', 'Costo medio', statsCurr.mediaKwh, statsPrev.mediaKwh, currentKey);
-
-  // 🆕 KPI TARIFFA
   setKPI('kpi-tariffa', 'Tariffa €/kWh-Smc', statsCurr.tariffaMedia, statsPrev.tariffaMedia, currentKey);
 
   renderChartMonthly(grouped);
@@ -372,7 +370,7 @@ function buildBolletta(userId) {
     consumi: toNumber('consumi'),
     importo: toNumber('importo'),
     tariffa: toNumber('tariffa', true),
-    tariffa_tipo: getValue('tariffa_tipo'), // 🆕 FISSA / INDICIZZATA
+    tariffa_tipo: getValue('tariffa_tipo'),
     quota: toNumber('quota', true),
     fornitore: getValue('fornitore'),
     mercato: getValue('mercato'),
