@@ -1,516 +1,216 @@
-<!DOCTYPE html>
-
-<html lang="it">
-
-<head>
-
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <title>
-    GiOKri Monitor
-  </title>
-
-  <!-- CHART -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- SUPABASE -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
-  <style>
-
-    body{
-      font-family:Arial;
-      background:#f3f4f6;
-      margin:0;
-      padding:20px;
-    }
-
-    h1,h2,h3{
-      margin-top:0;
-    }
-
-    .box{
-      background:white;
-      padding:20px;
-      border-radius:10px;
-      margin-bottom:20px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    input,
-    select,
-    textarea,
-    button{
-      width:100%;
-      padding:10px;
-      margin-top:8px;
-      margin-bottom:15px;
-      border:1px solid #ccc;
-      border-radius:6px;
-      box-sizing:border-box;
-    }
-
-    button{
-      background:#2563eb;
-      color:white;
-      border:none;
-      cursor:pointer;
-      font-weight:bold;
-    }
-
-    .dashboard-kpi{
-      display:grid;
-      grid-template-columns:
-        repeat(auto-fit,minmax(220px,1fr));
-      gap:15px;
-      margin-bottom:20px;
-    }
-
-    .kpi-card{
-      background:white;
-      padding:15px;
-      border-radius:10px;
-      box-shadow:0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    .item-storico{
-      background:white;
-      padding:15px;
-      border-radius:8px;
-      margin-bottom:10px;
-      border-left:5px solid #2563eb;
-    }
-
-    .alert{
-      padding:15px;
-      border-radius:8px;
-      margin-bottom:10px;
-      color:white;
-    }
-
-    .danger{
-      background:#dc2626;
-    }
-
-    .warning{
-      background:#f59e0b;
-    }
-
-    .ok{
-      background:#16a34a;
-    }
-
-  </style>
-
-</head>
-
-<body>
-
 <!-- ====================== -->
-<!-- LOGIN -->
+<!-- KPI DASHBOARD -->
+<!-- SOSTITUISCI SOLO QUESTO BLOCCO -->
 <!-- ====================== -->
 
-<div
-  id="auth-box"
-  class="box"
->
+<div class="dashboard-kpi">
+
+  <div class="kpi-card">
+    <div id="kpi-spesa"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div id="kpi-consumi"></div>
+  </div>
+
+  <div class="kpi-card">
+    <div id="kpi-media"></div>
+  </div>
+
+  <!-- 🔥 NUOVO KPI TARIFFA -->
+
+  <div class="kpi-card">
+    <div id="kpi-tariffa"></div>
+  </div>
+
+</div>
+
+<!-- ====================== -->
+<!-- ALERT -->
+<!-- AGGIUNGI SOTTO I KPI -->
+<!-- ====================== -->
+
+<div id="alerts"></div>
+
+<!-- ====================== -->
+<!-- FORM NUOVA BOLLETTA -->
+<!-- SOSTITUISCI SOLO LA PARTE FORM -->
+<!-- ====================== -->
+
+<div class="box">
 
   <h2>
-    Accesso
+    Nuova Bolletta
   </h2>
 
-  <input
-    id="log-email"
-    type="email"
-    placeholder="Email"
-  >
+  <!-- TIPO -->
+
+  <label>
+    Tipo
+  </label>
+
+  <select id="tipo">
+
+    <option value="LUCE">
+      Luce
+    </option>
+
+    <option value="GAS">
+      Gas
+    </option>
+
+  </select>
+
+  <!-- DATE -->
+
+  <label>
+    Periodo DAL
+  </label>
 
   <input
-    id="log-password"
-    type="password"
-    placeholder="Password"
+    type="date"
+    id="periodo_dal"
   >
 
-  <button onclick="loginUser()">
-    Login
-  </button>
-
-  <hr>
-
-  <h3>
-    Registrazione
-  </h3>
+  <label>
+    Periodo AL
+  </label>
 
   <input
-    id="reg-email"
-    type="email"
-    placeholder="Email"
+    type="date"
+    id="periodo_al"
   >
+
+  <!-- CONSUMI -->
+
+  <label>
+    Consumi
+  </label>
 
   <input
-    id="reg-password"
-    type="password"
-    placeholder="Password"
+    type="number"
+    id="consumi"
+    placeholder="Consumi"
   >
 
-  <button onclick="registerUser()">
-    Registrati
+  <!-- IMPORTO -->
+
+  <label>
+    Importo totale
+  </label>
+
+  <input
+    type="number"
+    step="0.01"
+    id="importo"
+    placeholder="Importo totale"
+  >
+
+  <!-- TARIFFA -->
+
+  <label>
+    Tariffa €/kWh o €/Smc
+  </label>
+
+  <input
+    type="number"
+    step="0.0001"
+    id="tariffa"
+    placeholder="Tariffa"
+  >
+
+  <!-- 🔥 NUOVO CAMPO -->
+
+  <label>
+    Tipo Tariffa
+  </label>
+
+  <select id="tariffa_tipo">
+
+    <option value="">
+      Seleziona
+    </option>
+
+    <option value="FISSA">
+      Fissa
+    </option>
+
+    <option value="INDICIZZATA">
+      Indicizzata
+    </option>
+
+  </select>
+
+  <!-- QUOTA -->
+
+  <label>
+    Quota fissa
+  </label>
+
+  <input
+    type="number"
+    step="0.01"
+    id="quota"
+    placeholder="Quota fissa"
+  >
+
+  <!-- FORNITORE -->
+
+  <label>
+    Fornitore
+  </label>
+
+  <input
+    type="text"
+    id="fornitore"
+    placeholder="Es. Enel Energia"
+  >
+
+  <!-- MERCATO -->
+
+  <label>
+    Mercato
+  </label>
+
+  <select id="mercato">
+
+    <option value="LIBERO">
+      Libero
+    </option>
+
+    <option value="TUTELATO">
+      Tutelato
+    </option>
+
+  </select>
+
+  <!-- POD -->
+
+  <label>
+    POD / PDR
+  </label>
+
+  <input
+    type="text"
+    id="pod_pdr"
+    placeholder="Codice POD o PDR"
+  >
+
+  <!-- NOTE -->
+
+  <label>
+    Note
+  </label>
+
+  <textarea
+    id="note"
+    placeholder="Note opzionali"
+  ></textarea>
+
+  <!-- SAVE -->
+
+  <button onclick="salvaBolletta()">
+    Salva bolletta
   </button>
 
 </div>
-
-<!-- ====================== -->
-<!-- APP -->
-<!-- ====================== -->
-
-<div
-  id="app"
-  style="display:none;"
->
-
-  <!-- HEADER -->
-
-  <div class="box">
-
-    <h1>
-      GiOKri Monitor
-    </h1>
-
-    <p>
-      Utente:
-      <span id="utente-email"></span>
-    </p>
-
-    <button onclick="logoutUser()">
-      Logout
-    </button>
-
-  </div>
-
-  <!-- ====================== -->
-  <!-- FILTRI -->
-  <!-- ====================== -->
-
-  <div class="box">
-
-    <h2>
-      Filtri
-    </h2>
-
-    <select
-      id="filter-anno"
-      onchange="caricaStorico()"
-    >
-      <option value="">
-        Tutti gli anni
-      </option>
-    </select>
-
-    <select
-      id="filter-fornitore"
-      onchange="caricaStorico()"
-    >
-      <option value="">
-        Tutti i fornitori
-      </option>
-    </select>
-
-    <select
-      id="filter-tipo"
-      onchange="caricaStorico()"
-    >
-      <option value="">
-        Tutti i tipi
-      </option>
-
-      <option value="LUCE">
-        Luce
-      </option>
-
-      <option value="GAS">
-        Gas
-      </option>
-
-    </select>
-
-  </div>
-
-  <!-- ====================== -->
-  <!-- KPI -->
-  <!-- ====================== -->
-
-  <div class="dashboard-kpi">
-
-    <div class="kpi-card">
-      <div id="kpi-spesa"></div>
-    </div>
-
-    <div class="kpi-card">
-      <div id="kpi-consumi"></div>
-    </div>
-
-    <div class="kpi-card">
-      <div id="kpi-media"></div>
-    </div>
-
-    <!-- 🔥 KPI TARIFFA -->
-
-    <div class="kpi-card">
-      <div id="kpi-tariffa"></div>
-    </div>
-
-  </div>
-
-  <!-- ====================== -->
-  <!-- ALERT -->
-  <!-- ====================== -->
-
-  <div
-    id="alerts"
-    class="box"
-  ></div>
-
-  <!-- ====================== -->
-  <!-- GRAFICO -->
-  <!-- ====================== -->
-
-  <div class="box">
-
-    <h2>
-      Andamento Spesa
-    </h2>
-
-    <canvas id="graficoSpesa"></canvas>
-
-  </div>
-
-  <!-- ====================== -->
-  <!-- NUOVA BOLLETTA -->
-  <!-- ====================== -->
-
-  <div class="box">
-
-    <h2>
-      Nuova Bolletta
-    </h2>
-
-    <!-- TIPO -->
-
-    <label>
-      Tipo
-    </label>
-
-    <select id="tipo">
-
-      <option value="LUCE">
-        Luce
-      </option>
-
-      <option value="GAS">
-        Gas
-      </option>
-
-    </select>
-
-    <!-- DATE -->
-
-    <label>
-      Periodo DAL
-    </label>
-
-    <input
-      type="date"
-      id="periodo_dal"
-    >
-
-    <label>
-      Periodo AL
-    </label>
-
-    <input
-      type="date"
-      id="periodo_al"
-    >
-
-    <!-- CONSUMI -->
-
-    <label>
-      Consumi
-    </label>
-
-    <input
-      type="number"
-      id="consumi"
-      placeholder="Consumi"
-    >
-
-    <!-- IMPORTO -->
-
-    <label>
-      Importo totale
-    </label>
-
-    <input
-      type="number"
-      step="0.01"
-      id="importo"
-      placeholder="Importo totale"
-    >
-
-    <!-- TARIFFA -->
-
-    <label>
-      Tariffa €/kWh o €/Smc
-    </label>
-
-    <input
-      type="number"
-      step="0.0001"
-      id="tariffa"
-      placeholder="Tariffa"
-    >
-
-    <!-- 🔥 TIPO TARIFFA -->
-
-    <label>
-      Tipo Tariffa
-    </label>
-
-    <select id="tariffa_tipo">
-
-      <option value="">
-        Seleziona
-      </option>
-
-      <option value="FISSA">
-        Fissa
-      </option>
-
-      <option value="INDICIZZATA">
-        Indicizzata
-      </option>
-
-    </select>
-
-    <!-- QUOTA -->
-
-    <label>
-      Quota fissa
-    </label>
-
-    <input
-      type="number"
-      step="0.01"
-      id="quota"
-      placeholder="Quota fissa"
-    >
-
-    <!-- FORNITORE -->
-
-    <label>
-      Fornitore
-    </label>
-
-    <input
-      type="text"
-      id="fornitore"
-      placeholder="Es. Enel Energia"
-    >
-
-    <!-- MERCATO -->
-
-    <label>
-      Mercato
-    </label>
-
-    <select id="mercato">
-
-      <option value="LIBERO">
-        Libero
-      </option>
-
-      <option value="TUTELATO">
-        Tutelato
-      </option>
-
-    </select>
-
-    <!-- POD -->
-
-    <label>
-      POD / PDR
-    </label>
-
-    <input
-      type="text"
-      id="pod_pdr"
-      placeholder="Codice POD o PDR"
-    >
-
-    <!-- NOTE -->
-
-    <label>
-      Note
-    </label>
-
-    <textarea
-      id="note"
-      placeholder="Note opzionali"
-    ></textarea>
-
-    <!-- SAVE -->
-
-    <button onclick="salvaBolletta()">
-      Salva bolletta
-    </button>
-
-  </div>
-
-  <!-- ====================== -->
-  <!-- STORICO -->
-  <!-- ====================== -->
-
-  <div class="box">
-
-    <h2>
-      Storico
-    </h2>
-
-    <div id="storico"></div>
-
-  </div>
-
-</div>
-
-<!-- ====================== -->
-<!-- SUPABASE CONFIG -->
-<!-- ====================== -->
-
-<script>
-
-  const SUPABASE_URL =
-    'INSERISCI_URL_SUPABASE';
-
-  const SUPABASE_KEY =
-    'INSERISCI_ANON_KEY';
-
-  const supabaseClient =
-    supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_KEY
-    );
-
-</script>
-
-<!-- APP -->
-
-<script src="app.js"></script>
-
-</body>
-
-</html>
