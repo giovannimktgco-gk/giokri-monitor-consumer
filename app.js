@@ -107,7 +107,7 @@ async function caricaStorico() {
 }
 
 // ======================
-// FILTER ENGINE
+// FILTER ENGINE (DATI)
 // ======================
 
 function applyFilters(data) {
@@ -166,7 +166,7 @@ function renderStorico(data) {
 }
 
 // ======================
-// DASHBOARD KPI CONTROLLABILE
+// DASHBOARD MONITOR CORE
 // ======================
 
 function renderDashboard(data) {
@@ -212,7 +212,7 @@ function renderDashboard(data) {
   setKPI('kpi-consumi', 'Consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, currentKey);
   setKPI('kpi-media', 'Costo medio', statsCurr.mediaKwh, statsPrev.mediaKwh, currentKey);
 
-  renderChartByMonth(grouped);
+  renderChartMonthly(grouped);
 }
 
 // ======================
@@ -239,7 +239,7 @@ function setKPI(id, label, current, previous, period) {
 
   el.innerHTML = `
     <div style="font-size:12px; color:#666;">
-      ${label} - ${period || ''}
+      ${label} - ${period || 'Periodo'}
     </div>
 
     <div style="font-size:22px; font-weight:bold;">
@@ -273,10 +273,10 @@ function groupByMonth(data) {
 }
 
 // ======================
-// CHART (MONTHLY TREND)
+// CHART MONITOR
 // ======================
 
-function renderChartByMonth(grouped) {
+function renderChartMonthly(grouped) {
 
   const labels = Object.keys(grouped).sort();
 
@@ -324,7 +324,7 @@ function calculateStats(data) {
 }
 
 // ======================
-// FILTER OPTIONS
+// FILTER OPTIONS (UI)
 // ======================
 
 function updateFilterOptions(data) {
@@ -348,23 +348,8 @@ function updateFilterOptions(data) {
   fillSelectOnce('filter-fornitore', fornitori);
 }
 
-function fillSelectOnce(id, values) {
-
-  const select = document.getElementById(id);
-  if (!select) return;
-
-  if (select.options.length > 1) return;
-
-  values.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v;
-    opt.innerText = v;
-    select.appendChild(opt);
-  });
-}
-
 // ======================
-// BUILD OBJECT
+// OBJECT BUILDER
 // ======================
 
 function buildBolletta(userId) {
