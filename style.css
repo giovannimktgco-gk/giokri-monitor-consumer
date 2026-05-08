@@ -39,3 +39,34 @@ button{
   align-items:center;
   margin-bottom:20px;
 }
+.dashboard{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:12px;
+  margin-bottom:20px;
+}
+
+.kpi-card{
+  background:#1e293b;
+  padding:16px;
+  border-radius:12px;
+}
+
+.kpi-card h3{
+  margin:0 0 10px 0;
+  font-size:14px;
+  color:#94a3b8;
+}
+
+.kpi-card div{
+  font-size:24px;
+  font-weight:bold;
+  color:#f59e0b;
+}
+
+.chart-container{
+  background:#1e293b;
+  padding:16px;
+  border-radius:12px;
+  margin-bottom:20px;
+}
