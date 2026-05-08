@@ -1,3 +1,4 @@
+
 // ======================
 // STATE
 // ======================
@@ -45,7 +46,7 @@ async function logoutUser() {
 }
 
 // ======================
-// INIT
+// INIT APP
 // ======================
 
 async function loadApp() {
@@ -62,7 +63,7 @@ async function loadApp() {
 }
 
 // ======================
-// SAVE
+// SAVE BOLLETTA
 // ======================
 
 async function salvaBolletta() {
@@ -165,7 +166,7 @@ function renderStorico(data) {
 }
 
 // ======================
-// DASHBOARD (CORE INTELLIGENCE)
+// DASHBOARD KPI CONTROLLABILE
 // ======================
 
 function renderDashboard(data) {
@@ -175,12 +176,9 @@ function renderDashboard(data) {
     return;
   }
 
-  // =========================
-  // GROUP BY MONTH (REAL)
-  // =========================
+  const selectedMonth = getValue('kpi-mese');
 
   const grouped = groupByMonth(data);
-
   const months = Object.keys(grouped).sort();
 
   if (months.length < 2) {
@@ -188,54 +186,40 @@ function renderDashboard(data) {
     return;
   }
 
-  const lastMonth = grouped[months[months.length - 1]];
-  const prevMonth = grouped[months[months.length - 2]];
+  let currentKey;
+  let prevKey;
 
-  const statsCurr = calculateStats(lastMonth);
-  const statsPrev = calculateStats(prevMonth);
+  if (selectedMonth && grouped[selectedMonth]) {
 
-  // =========================
-  // KPI EVOLUTION
-  // =========================
+    currentKey = selectedMonth;
 
-  setKPI('kpi-spesa', statsCurr.totaleSpesa, statsPrev.totaleSpesa, '€');
-  setKPI('kpi-consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, '');
-  setKPI('kpi-media', statsCurr.mediaKwh, statsPrev.mediaKwh, '€');
+    const idx = months.indexOf(selectedMonth);
 
-  // =========================
-  // ALERT LOGIC
-  // =========================
+    prevKey = months[idx - 1] || months[idx];
+  } else {
 
-  generateAlerts(statsCurr, statsPrev);
+    currentKey = months[months.length - 1];
+    prevKey = months[months.length - 2];
+  }
 
-  renderChart(data);
-}
+  const curr = grouped[currentKey] || [];
+  const prev = grouped[prevKey] || [];
 
-// ======================
-// GROUP BY MONTH ENGINE
-// ======================
+  const statsCurr = calculateStats(curr);
+  const statsPrev = calculateStats(prev);
 
-function groupByMonth(data) {
+  setKPI('kpi-spesa', 'Spesa', statsCurr.totaleSpesa, statsPrev.totaleSpesa, currentKey);
+  setKPI('kpi-consumi', 'Consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, currentKey);
+  setKPI('kpi-media', 'Costo medio', statsCurr.mediaKwh, statsPrev.mediaKwh, currentKey);
 
-  const groups = {};
-
-  data.forEach(b => {
-
-    const key = (b.periodo_al || '').slice(0, 7); // YYYY-MM
-
-    if (!groups[key]) groups[key] = [];
-
-    groups[key].push(b);
-  });
-
-  return groups;
+  renderChartByMonth(grouped);
 }
 
 // ======================
 // KPI ENGINE
 // ======================
 
-function setKPI(id, current, previous, prefix = '') {
+function setKPI(id, label, current, previous, period) {
 
   const el = document.getElementById(id);
   if (!el) return;
@@ -243,7 +227,7 @@ function setKPI(id, current, previous, prefix = '') {
   const curr = Number(current);
   const prev = Number(previous || 0);
 
-  let variation = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+  const variation = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
 
   const icon =
     variation > 0 ? '↑' :
@@ -254,9 +238,14 @@ function setKPI(id, current, previous, prefix = '') {
     variation < -10 ? 'green' : 'orange';
 
   el.innerHTML = `
-    <div style="font-size:22px; font-weight:bold;">
-      ${prefix} ${curr.toFixed(2)}
+    <div style="font-size:12px; color:#666;">
+      ${label} - ${period || ''}
     </div>
+
+    <div style="font-size:22px; font-weight:bold;">
+      ${curr.toFixed(2)}
+    </div>
+
     <div style="font-size:12px; color:${color}; margin-top:4px;">
       ${icon} ${variation.toFixed(1)}% vs mese precedente
     </div>
@@ -264,53 +253,40 @@ function setKPI(id, current, previous, prefix = '') {
 }
 
 // ======================
-// ALERT ENGINE
+// GROUP BY MONTH
 // ======================
 
-function generateAlerts(curr, prev) {
+function groupByMonth(data) {
 
-  const spesaDiff = ((curr.totaleSpesa - prev.totaleSpesa) / (prev.totaleSpesa || 1)) * 100;
+  const groups = {};
 
-  if (spesaDiff > 15) {
-    console.warn("⚠ ALERT: aumento spesa significativo");
-    showAlert("⚠ ATTENZIONE: aumento spesa > 15%");
-  }
-}
+  data.forEach(b => {
 
-function showAlert(msg) {
+    const key = (b.periodo_al || '').slice(0, 7);
 
-  let box = document.getElementById('alert-box');
+    if (!groups[key]) groups[key] = [];
 
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'alert-box';
-    box.style.padding = '10px';
-    box.style.background = '#ffdddd';
-    box.style.color = '#900';
-    document.getElementById('app').prepend(box);
-  }
+    groups[key].push(b);
+  });
 
-  box.innerText = msg;
+  return groups;
 }
 
 // ======================
-// CHART
+// CHART (MONTHLY TREND)
 // ======================
 
-function renderChart(data) {
-
-  const ctx = document.getElementById('graficoSpesa');
-  if (!ctx) return;
-
-  const grouped = groupByMonth(data);
+function renderChartByMonth(grouped) {
 
   const labels = Object.keys(grouped).sort();
 
   const values = labels.map(m => {
-
     const stats = calculateStats(grouped[m]);
     return stats.totaleSpesa;
   });
+
+  const ctx = document.getElementById('graficoSpesa');
+  if (!ctx) return;
 
   if (chartInstance) chartInstance.destroy();
 
@@ -327,7 +303,7 @@ function renderChart(data) {
 }
 
 // ======================
-// STATS
+// STATS ENGINE
 // ======================
 
 function calculateStats(data) {
@@ -353,14 +329,21 @@ function calculateStats(data) {
 
 function updateFilterOptions(data) {
 
+  const mesi = new Set();
   const anni = new Set();
   const fornitori = new Set();
 
   data.forEach(b => {
-    if (b.periodo_al) anni.add(b.periodo_al.slice(0, 4));
+
+    if (b.periodo_al) {
+      mesi.add(b.periodo_al.slice(0, 7));
+      anni.add(b.periodo_al.slice(0, 4));
+    }
+
     if (b.fornitore) fornitori.add(b.fornitore);
   });
 
+  fillSelectOnce('kpi-mese', mesi);
   fillSelectOnce('filter-anno', anni);
   fillSelectOnce('filter-fornitore', fornitori);
 }
