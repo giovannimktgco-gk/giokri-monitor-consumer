@@ -77,8 +77,11 @@ async function salvaBolletta(){
     tipo:
       document.getElementById('tipo').value,
 
-    mese:
-      document.getElementById('mese').value,
+    periodo_dal:
+      document.getElementById('periodo_dal').value,
+
+    periodo_al:
+      document.getElementById('periodo_al').value,
 
     consumi:
       parseFloat(
@@ -100,6 +103,15 @@ async function salvaBolletta(){
         document.getElementById('quota').value
       ) || null,
 
+    fornitore:
+      document.getElementById('fornitore').value,
+
+    mercato:
+      document.getElementById('mercato').value,
+
+    pod_pdr:
+      document.getElementById('pod_pdr').value,
+
     note:
       document.getElementById('note').value
   };
@@ -114,65 +126,7 @@ async function salvaBolletta(){
     return;
   }
 
-  alert('Bolletta salvata');
+  alert('Bolletta salvata correttamente');
 
   caricaStorico();
 }
-
-async function caricaStorico(){
-
-  const {
-    data:{user}
-  } = await supabaseClient.auth.getUser();
-
-  const { data,error } =
-    await supabaseClient
-      .from('bollette')
-      .select('*')
-      .eq('user_id',user.id)
-      .order('mese',{ascending:false});
-
-  if(error){
-    console.log(error);
-    return;
-  }
-
-  const storico =
-    document.getElementById('storico');
-
-  storico.innerHTML='';
-
-  data.forEach(b=>{
-
-    storico.innerHTML += `
-      <div class="card">
-
-        <h3>${b.tipo}</h3>
-
-        <p>${b.mese}</p>
-
-        <p>
-        Consumi:
-        ${b.consumi}
-        </p>
-
-        <p>
-        Importo:
-        € ${b.importo}
-        </p>
-
-      </div>
-    `;
-  });
-}
-
-window.addEventListener('load', async ()=>{
-
-  const {
-    data:{session}
-  } = await supabaseClient.auth.getSession();
-
-  if(session){
-    loadApp();
-  }
-});
