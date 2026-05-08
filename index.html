@@ -1,135 +1,516 @@
 <!DOCTYPE html>
+
 <html lang="it">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>GioKri Monitor</title>
+  <meta charset="UTF-8">
 
-<link rel="stylesheet" href="style.css">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>
+    GiOKri Monitor
+  </title>
+
+  <!-- CHART -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+  <style>
+
+    body{
+      font-family:Arial;
+      background:#f3f4f6;
+      margin:0;
+      padding:20px;
+    }
+
+    h1,h2,h3{
+      margin-top:0;
+    }
+
+    .box{
+      background:white;
+      padding:20px;
+      border-radius:10px;
+      margin-bottom:20px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    input,
+    select,
+    textarea,
+    button{
+      width:100%;
+      padding:10px;
+      margin-top:8px;
+      margin-bottom:15px;
+      border:1px solid #ccc;
+      border-radius:6px;
+      box-sizing:border-box;
+    }
+
+    button{
+      background:#2563eb;
+      color:white;
+      border:none;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .dashboard-kpi{
+      display:grid;
+      grid-template-columns:
+        repeat(auto-fit,minmax(220px,1fr));
+      gap:15px;
+      margin-bottom:20px;
+    }
+
+    .kpi-card{
+      background:white;
+      padding:15px;
+      border-radius:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .item-storico{
+      background:white;
+      padding:15px;
+      border-radius:8px;
+      margin-bottom:10px;
+      border-left:5px solid #2563eb;
+    }
+
+    .alert{
+      padding:15px;
+      border-radius:8px;
+      margin-bottom:10px;
+      color:white;
+    }
+
+    .danger{
+      background:#dc2626;
+    }
+
+    .warning{
+      background:#f59e0b;
+    }
+
+    .ok{
+      background:#16a34a;
+    }
+
+  </style>
+
 </head>
 
 <body>
 
-<div class="container">
+<!-- ====================== -->
+<!-- LOGIN -->
+<!-- ====================== -->
 
-<h1>GioKri Monitor</h1>
+<div
+  id="auth-box"
+  class="box"
+>
 
-<div id="auth-box">
+  <h2>
+    Accesso
+  </h2>
 
-<h2>Registrazione</h2>
+  <input
+    id="log-email"
+    type="email"
+    placeholder="Email"
+  >
 
-<input type="email" id="reg-email" placeholder="Email">
-<input type="password" id="reg-password" placeholder="Password">
+  <input
+    id="log-password"
+    type="password"
+    placeholder="Password"
+  >
 
-<button onclick="registerUser()">
-Registrati
-</button>
+  <button onclick="loginUser()">
+    Login
+  </button>
 
-<hr>
+  <hr>
 
-<h2>Login</h2>
+  <h3>
+    Registrazione
+  </h3>
 
-<input type="email" id="log-email" placeholder="Email">
-<input type="password" id="log-password" placeholder="Password">
+  <input
+    id="reg-email"
+    type="email"
+    placeholder="Email"
+  >
 
-<button onclick="loginUser()">
-Accedi
-</button>
+  <input
+    id="reg-password"
+    type="password"
+    placeholder="Password"
+  >
 
-</div>
-
-<div id="app" style="display:none;">
-<div class="dashboard">
-
-<div class="kpi-card">
-<h3>Spesa Totale</h3>
-<div id="kpi-spesa">€ 0</div>
-</div>
-
-<div class="kpi-card">
-<h3>Consumi Totali</h3>
-<div id="kpi-consumi">0</div>
-</div>
-
-<div class="kpi-card">
-<h3>Costo Medio</h3>
-<div id="kpi-media">€ 0</div>
-</div>
-
-</div>
-
-<div class="chart-container">
-<canvas id="graficoSpesa"></canvas>
-</div>
-
-<div class="topbar">
-<span id="utente-email"></span>
-
-<button onclick="logoutUser()">
-Esci
-</button>
-</div>
-
-<h2>Nuova Bolletta</h2>
-
-<select id="tipo">
-<option value="Luce">💡 Luce</option>
-<option value="Gas">🔥 Gas</option>
-</select>
-
-<label>Periodo DAL</label>
-<input type="date" id="periodo_dal">
-
-<label>Periodo AL</label>
-<input type="date" id="periodo_al">
-
-<label>Consumi</label>
-<input type="number" id="consumi" placeholder="Consumi">
-
-<label>Importo totale</label>
-<input type="number" id="importo" placeholder="Importo totale">
-
-<label>Tariffa €/kWh o €/Smc</label>
-<input type="number" id="tariffa" placeholder="Tariffa" step="0.0001">
-
-<label>Quota fissa</label>
-<input type="number" id="quota" placeholder="Quota fissa">
-
-<label>Fornitore</label>
-<input type="text" id="fornitore" placeholder="Es. Enel Energia">
-
-<label>Mercato</label>
-<select id="mercato">
-<option value="Libero">Libero</option>
-<option value="Tutele Graduali">Tutele Graduali</option>
-<option value="Tutela">Tutela</option>
-</select>
-
-<label>POD / PDR</label>
-<input type="text" id="pod_pdr" placeholder="Codice POD o PDR">
-
-<label>Note</label>
-<input type="text" id="note" placeholder="Note opzionali">
-
-<button onclick="salvaBolletta()">
-Salva bolletta
-</button>
-</button>
-
-<h2>Storico</h2>
-
-<div id="storico"></div>
+  <button onclick="registerUser()">
+    Registrati
+  </button>
 
 </div>
 
+<!-- ====================== -->
+<!-- APP -->
+<!-- ====================== -->
+
+<div
+  id="app"
+  style="display:none;"
+>
+
+  <!-- HEADER -->
+
+  <div class="box">
+
+    <h1>
+      GiOKri Monitor
+    </h1>
+
+    <p>
+      Utente:
+      <span id="utente-email"></span>
+    </p>
+
+    <button onclick="logoutUser()">
+      Logout
+    </button>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- FILTRI -->
+  <!-- ====================== -->
+
+  <div class="box">
+
+    <h2>
+      Filtri
+    </h2>
+
+    <select
+      id="filter-anno"
+      onchange="caricaStorico()"
+    >
+      <option value="">
+        Tutti gli anni
+      </option>
+    </select>
+
+    <select
+      id="filter-fornitore"
+      onchange="caricaStorico()"
+    >
+      <option value="">
+        Tutti i fornitori
+      </option>
+    </select>
+
+    <select
+      id="filter-tipo"
+      onchange="caricaStorico()"
+    >
+      <option value="">
+        Tutti i tipi
+      </option>
+
+      <option value="LUCE">
+        Luce
+      </option>
+
+      <option value="GAS">
+        Gas
+      </option>
+
+    </select>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- KPI -->
+  <!-- ====================== -->
+
+  <div class="dashboard-kpi">
+
+    <div class="kpi-card">
+      <div id="kpi-spesa"></div>
+    </div>
+
+    <div class="kpi-card">
+      <div id="kpi-consumi"></div>
+    </div>
+
+    <div class="kpi-card">
+      <div id="kpi-media"></div>
+    </div>
+
+    <!-- 🔥 KPI TARIFFA -->
+
+    <div class="kpi-card">
+      <div id="kpi-tariffa"></div>
+    </div>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- ALERT -->
+  <!-- ====================== -->
+
+  <div
+    id="alerts"
+    class="box"
+  ></div>
+
+  <!-- ====================== -->
+  <!-- GRAFICO -->
+  <!-- ====================== -->
+
+  <div class="box">
+
+    <h2>
+      Andamento Spesa
+    </h2>
+
+    <canvas id="graficoSpesa"></canvas>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- NUOVA BOLLETTA -->
+  <!-- ====================== -->
+
+  <div class="box">
+
+    <h2>
+      Nuova Bolletta
+    </h2>
+
+    <!-- TIPO -->
+
+    <label>
+      Tipo
+    </label>
+
+    <select id="tipo">
+
+      <option value="LUCE">
+        Luce
+      </option>
+
+      <option value="GAS">
+        Gas
+      </option>
+
+    </select>
+
+    <!-- DATE -->
+
+    <label>
+      Periodo DAL
+    </label>
+
+    <input
+      type="date"
+      id="periodo_dal"
+    >
+
+    <label>
+      Periodo AL
+    </label>
+
+    <input
+      type="date"
+      id="periodo_al"
+    >
+
+    <!-- CONSUMI -->
+
+    <label>
+      Consumi
+    </label>
+
+    <input
+      type="number"
+      id="consumi"
+      placeholder="Consumi"
+    >
+
+    <!-- IMPORTO -->
+
+    <label>
+      Importo totale
+    </label>
+
+    <input
+      type="number"
+      step="0.01"
+      id="importo"
+      placeholder="Importo totale"
+    >
+
+    <!-- TARIFFA -->
+
+    <label>
+      Tariffa €/kWh o €/Smc
+    </label>
+
+    <input
+      type="number"
+      step="0.0001"
+      id="tariffa"
+      placeholder="Tariffa"
+    >
+
+    <!-- 🔥 TIPO TARIFFA -->
+
+    <label>
+      Tipo Tariffa
+    </label>
+
+    <select id="tariffa_tipo">
+
+      <option value="">
+        Seleziona
+      </option>
+
+      <option value="FISSA">
+        Fissa
+      </option>
+
+      <option value="INDICIZZATA">
+        Indicizzata
+      </option>
+
+    </select>
+
+    <!-- QUOTA -->
+
+    <label>
+      Quota fissa
+    </label>
+
+    <input
+      type="number"
+      step="0.01"
+      id="quota"
+      placeholder="Quota fissa"
+    >
+
+    <!-- FORNITORE -->
+
+    <label>
+      Fornitore
+    </label>
+
+    <input
+      type="text"
+      id="fornitore"
+      placeholder="Es. Enel Energia"
+    >
+
+    <!-- MERCATO -->
+
+    <label>
+      Mercato
+    </label>
+
+    <select id="mercato">
+
+      <option value="LIBERO">
+        Libero
+      </option>
+
+      <option value="TUTELATO">
+        Tutelato
+      </option>
+
+    </select>
+
+    <!-- POD -->
+
+    <label>
+      POD / PDR
+    </label>
+
+    <input
+      type="text"
+      id="pod_pdr"
+      placeholder="Codice POD o PDR"
+    >
+
+    <!-- NOTE -->
+
+    <label>
+      Note
+    </label>
+
+    <textarea
+      id="note"
+      placeholder="Note opzionali"
+    ></textarea>
+
+    <!-- SAVE -->
+
+    <button onclick="salvaBolletta()">
+      Salva bolletta
+    </button>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- STORICO -->
+  <!-- ====================== -->
+
+  <div class="box">
+
+    <h2>
+      Storico
+    </h2>
+
+    <div id="storico"></div>
+
+  </div>
+
 </div>
 
-<script src="supabase-config.js"></script>
+<!-- ====================== -->
+<!-- SUPABASE CONFIG -->
+<!-- ====================== -->
+
+<script>
+
+  const SUPABASE_URL =
+    'INSERISCI_URL_SUPABASE';
+
+  const SUPABASE_KEY =
+    'INSERISCI_ANON_KEY';
+
+  const supabaseClient =
+    supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+</script>
+
+<!-- APP -->
+
 <script src="app.js"></script>
 
 </body>
+
 </html>
