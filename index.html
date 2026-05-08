@@ -54,24 +54,47 @@ Esci
 <h2>Nuova Bolletta</h2>
 
 <select id="tipo">
-<option value="Luce">Luce</option>
-<option value="Gas">Gas</option>
+<option value="Luce">💡 Luce</option>
+<option value="Gas">🔥 Gas</option>
 </select>
 
-<input type="month" id="mese">
+<label>Periodo DAL</label>
+<input type="date" id="periodo_dal">
 
+<label>Periodo AL</label>
+<input type="date" id="periodo_al">
+
+<label>Consumi</label>
 <input type="number" id="consumi" placeholder="Consumi">
 
-<input type="number" id="importo" placeholder="Importo">
+<label>Importo totale</label>
+<input type="number" id="importo" placeholder="Importo totale">
 
-<input type="number" id="tariffa" placeholder="Tariffa">
+<label>Tariffa €/kWh o €/Smc</label>
+<input type="number" id="tariffa" placeholder="Tariffa" step="0.0001">
 
+<label>Quota fissa</label>
 <input type="number" id="quota" placeholder="Quota fissa">
 
-<input type="text" id="note" placeholder="Note">
+<label>Fornitore</label>
+<input type="text" id="fornitore" placeholder="Es. Enel Energia">
+
+<label>Mercato</label>
+<select id="mercato">
+<option value="Libero">Libero</option>
+<option value="Tutele Graduali">Tutele Graduali</option>
+<option value="Tutela">Tutela</option>
+</select>
+
+<label>POD / PDR</label>
+<input type="text" id="pod_pdr" placeholder="Codice POD o PDR">
+
+<label>Note</label>
+<input type="text" id="note" placeholder="Note opzionali">
 
 <button onclick="salvaBolletta()">
 Salva bolletta
+</button>
 </button>
 
 <h2>Storico</h2>
