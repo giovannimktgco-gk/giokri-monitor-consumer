@@ -1,5 +1,4 @@
 
-
 // ======================
 // STATE
 // ======================
@@ -47,7 +46,7 @@ async function logoutUser() {
 }
 
 // ======================
-// INIT APP
+// INIT
 // ======================
 
 async function loadApp() {
@@ -100,11 +99,22 @@ async function caricaStorico() {
 
   bolletteCache = data || [];
 
-  const filtered = applyFilters(bolletteCache);
+  const filtered = applyFilters(bollettaCacheFix(bolletteCache));
 
   renderStorico(filtered);
   renderDashboard(filtered);
   updateFilterOptions(bolletteCache);
+}
+
+// ======================
+// FIX CONSISTENZA DATI
+// ======================
+
+function bollettaCacheFix(data) {
+  return data.map(b => ({
+    ...b,
+    tariffa_tipo: b.tariffa_tipo || 'NON SPECIFICATO'
+  }));
 }
 
 // ======================
@@ -141,7 +151,7 @@ function applyFilters(data) {
 }
 
 // ======================
-// STORICO
+// STORICO (ORA MOSTRA TIPO TARIFFA SICURO)
 // ======================
 
 function renderStorico(data) {
@@ -157,10 +167,10 @@ function renderStorico(data) {
     div.className = 'item-storico';
 
     div.innerHTML = `
-      <strong>${b.tipo || '-'}</strong>
-      (${b.tariffa_tipo || 'n/d'})<br>
-      ${b.periodo_dal || ''} → ${b.periodo_al || ''}<br>
-      € ${format(b.importo)} | ${format(b.consumi)} kWh
+      <strong>${b.tipo || '-'}</strong><br>
+      🧾 Tariffa: <b>${b.tariffa_tipo}</b><br>
+      📅 ${b.periodo_dal || ''} → ${b.periodo_al || ''}<br>
+      ⚡ € ${format(b.importo)} | ${format(b.consumi)} kWh
     `;
 
     container.appendChild(div);
@@ -168,13 +178,14 @@ function renderStorico(data) {
 }
 
 // ======================
-// DASHBOARD CORE
+// DASHBOARD
 // ======================
 
 function renderDashboard(data) {
 
   if (!data || data.length === 0) {
     resetKPI();
+    renderAlerts([]);
     return;
   }
 
@@ -185,20 +196,13 @@ function renderDashboard(data) {
 
   if (months.length < 2) return;
 
-  let currentKey;
-  let prevKey;
+  let currentKey = months[months.length - 1];
+  let prevKey = months[months.length - 2];
 
   if (selectedMonth && grouped[selectedMonth]) {
-
     currentKey = selectedMonth;
-
     const idx = months.indexOf(selectedMonth);
     prevKey = months[idx - 1] || months[idx];
-
-  } else {
-
-    currentKey = months[months.length - 1];
-    prevKey = months[months.length - 2];
   }
 
   const curr = grouped[currentKey] || [];
@@ -212,7 +216,65 @@ function renderDashboard(data) {
   setKPI('kpi-media', 'Costo medio', statsCurr.mediaKwh, statsPrev.mediaKwh, currentKey);
   setKPI('kpi-tariffa', 'Tariffa €/kWh-Smc', statsCurr.tariffaMedia, statsPrev.tariffaMedia, currentKey);
 
+  const alerts = generateAlerts(statsCurr, statsPrev, curr, prev);
+  renderAlerts(alerts);
+
   renderChartMonthly(grouped);
+}
+
+// ======================
+// ALERT ENGINE
+// ======================
+
+function generateAlerts(curr, prev, currData, prevData) {
+
+  const alerts = [];
+
+  const spesaVar = percent(curr.totaleSpesa, prev.totaleSpesa);
+  const consVar = percent(curr.totaleConsumi, prev.totaleConsumi);
+  const tariffaVar = percent(curr.tariffaMedia, prev.tariffaMedia);
+
+  if (spesaVar > 10) {
+    alerts.push({
+      type: 'danger',
+      title: 'Aumento spesa',
+      message: `Spesa +${spesaVar.toFixed(1)}% vs mese precedente`
+    });
+  }
+
+  if (consVar > 15) {
+    alerts.push({
+      type: 'warning',
+      title: 'Consumi in aumento',
+      message: `Consumi +${consVar.toFixed(1)}%`
+    });
+  }
+
+  if (tariffaVar > 5) {
+    alerts.push({
+      type: 'danger',
+      title: 'Tariffa in aumento',
+      message: `Tariffa +${tariffaVar.toFixed(1)}%`
+    });
+  }
+
+  const indic = currData.filter(b => b.tariffa_tipo === 'INDICIZZATA').length;
+  if (currData.length && indic / currData.length > 0.6) {
+    alerts.push({
+      type: 'warning',
+      title: 'Rischio volatilità',
+      message: 'Oltre 60% contratti indicizzati'
+    });
+  }
+
+  return alerts;
+}
+
+function percent(a, b) {
+  a = Number(a || 0);
+  b = Number(b || 0);
+  if (b === 0) return 0;
+  return ((a - b) / b) * 100;
 }
 
 // ======================
@@ -227,157 +289,67 @@ function setKPI(id, label, current, previous, period) {
   const curr = Number(current);
   const prev = Number(previous || 0);
 
-  const variation = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+  const varPct = percent(curr, prev);
 
-  const icon =
-    variation > 0 ? '↑' :
-    variation < 0 ? '↓' : '→';
-
-  const color =
-    variation > 10 ? 'red' :
-    variation < -10 ? 'green' : 'orange';
+  const icon = varPct > 0 ? '↑' : varPct < 0 ? '↓' : '→';
 
   el.innerHTML = `
-    <div style="font-size:12px; color:#666;">
-      ${label} - ${period || ''}
-    </div>
-
-    <div style="font-size:22px; font-weight:bold;">
-      ${curr.toFixed(4)}
-    </div>
-
-    <div style="font-size:12px; color:${color}; margin-top:4px;">
-      ${icon} ${variation.toFixed(1)}% vs mese precedente
+    <div style="font-size:12px;color:#666">${label} - ${period}</div>
+    <div style="font-size:22px;font-weight:bold">${curr.toFixed(4)}</div>
+    <div style="font-size:12px;color:${varPct > 10 ? 'red' : varPct < -10 ? 'green' : 'orange'}">
+      ${icon} ${varPct.toFixed(1)}%
     </div>
   `;
 }
 
 // ======================
-// GROUP BY MONTH
-// ======================
-
-function groupByMonth(data) {
-
-  const groups = {};
-
-  data.forEach(b => {
-
-    const key = (b.periodo_al || '').slice(0, 7);
-
-    if (!groups[key]) groups[key] = [];
-
-    groups[key].push(b);
-  });
-
-  return groups;
-}
-
-// ======================
-// CHART
-// ======================
-
-function renderChartMonthly(grouped) {
-
-  const labels = Object.keys(grouped).sort();
-
-  const values = labels.map(m => {
-    const stats = calculateStats(grouped[m]);
-    return stats.totaleSpesa;
-  });
-
-  const ctx = document.getElementById('graficoSpesa');
-  if (!ctx) return;
-
-  if (chartInstance) chartInstance.destroy();
-
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Spesa mensile €',
-        data: values
-      }]
-    }
-  });
-}
-
-// ======================
-// STATS ENGINE
+// STATS
 // ======================
 
 function calculateStats(data) {
 
-  let totaleSpesa = 0;
-  let totaleConsumi = 0;
-  let tariffaTot = 0;
-  let countTariffa = 0;
+  let spesa = 0;
+  let cons = 0;
+  let t = 0;
+  let c = 0;
 
   data.forEach(b => {
-
-    totaleSpesa += Number(b.importo || 0);
-    totaleConsumi += Number(b.consumi || 0);
+    spesa += Number(b.importo || 0);
+    cons += Number(b.consumi || 0);
 
     if (b.tariffa) {
-      tariffaTot += Number(b.tariffa);
-      countTariffa++;
+      t += Number(b.tariffa);
+      c++;
     }
   });
 
   return {
-    totaleSpesa: totaleSpesa.toFixed(2),
-    totaleConsumi: totaleConsumi.toFixed(0),
-    mediaKwh: (totaleSpesa / (totaleConsumi || 1)).toFixed(3),
-    tariffaMedia: (countTariffa ? tariffaTot / countTariffa : 0).toFixed(4)
+    totaleSpesa: spesa.toFixed(2),
+    totaleConsumi: cons.toFixed(0),
+    mediaKwh: (spesa / (cons || 1)).toFixed(3),
+    tariffaMedia: (c ? t / c : 0).toFixed(4)
   };
 }
 
 // ======================
-// FILTER OPTIONS
+// ALERT UI
 // ======================
 
-function updateFilterOptions(data) {
+function renderAlerts(alerts) {
 
-  const mesi = new Set();
-  const anni = new Set();
-  const fornitori = new Set();
+  const el = document.getElementById('alerts');
+  if (!el) return;
 
-  data.forEach(b => {
+  if (!alerts.length) {
+    el.innerHTML = `<div class="alert ok">Nessuna anomalia rilevata</div>`;
+    return;
+  }
 
-    if (b.periodo_al) {
-      mesi.add(b.periodo_al.slice(0, 7));
-      anni.add(b.periodo_al.slice(0, 4));
-    }
-
-    if (b.fornitore) fornitori.add(b.fornitore);
-  });
-
-  fillSelectOnce('kpi-mese', mesi);
-  fillSelectOnce('filter-anno', anni);
-  fillSelectOnce('filter-fornitore', fornitori);
-}
-
-// ======================
-// BUILD OBJECT
-// ======================
-
-function buildBolletta(userId) {
-
-  return {
-    user_id: userId,
-    tipo: getValue('tipo'),
-    periodo_dal: getValue('periodo_dal'),
-    periodo_al: getValue('periodo_al'),
-    consumi: toNumber('consumi'),
-    importo: toNumber('importo'),
-    tariffa: toNumber('tariffa', true),
-    tariffa_tipo: getValue('tariffa_tipo'),
-    quota: toNumber('quota', true),
-    fornitore: getValue('fornitore'),
-    mercato: getValue('mercato'),
-    pod_pdr: getValue('pod_pdr'),
-    note: getValue('note')
-  };
+  el.innerHTML = alerts.map(a =>
+    `<div class="alert ${a.type}">
+      <b>${a.title}</b><br>${a.message}
+    </div>`
+  ).join('');
 }
 
 // ======================
@@ -388,23 +360,18 @@ function getValue(id) {
   return document.getElementById(id)?.value || '';
 }
 
-function toNumber(id, nullable = false) {
-  const val = parseFloat(document.getElementById(id)?.value);
-  return isNaN(val) ? (nullable ? null : 0) : val;
-}
-
-function setTextSafe(id, value) {
+function setTextSafe(id, v) {
   const el = document.getElementById(id);
-  if (el) el.innerText = value;
+  if (el) el.innerText = v;
 }
 
 function format(v) {
   return Number(v || 0).toFixed(2);
 }
 
-function toggleUI(isLogged) {
-  document.getElementById('auth-box').style.display = isLogged ? 'none' : 'block';
-  document.getElementById('app').style.display = isLogged ? 'block' : 'none';
+function toggleUI(on) {
+  document.getElementById('auth-box').style.display = on ? 'none' : 'block';
+  document.getElementById('app').style.display = on ? 'block' : 'none';
 }
 
 function resetKPI() {
