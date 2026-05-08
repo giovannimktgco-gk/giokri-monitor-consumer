@@ -1,41 +1,40 @@
 // ======================
+// STATE
+// ======================
+
+let chartInstance = null;
+let bolletteCache = [];
+
+// ======================
 // AUTH
 // ======================
 
 async function registerUser() {
 
-  const email = document.getElementById('reg-email').value;
-  const password = document.getElementById('reg-password').value;
+  const email = getValue('reg-email');
+  const password = getValue('reg-password');
 
   const { error } = await supabaseClient.auth.signUp({
     email,
     password
   });
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  alert('Registrazione completata');
+  handleError(error, 'Registrazione completata');
 }
 
 async function loginUser() {
 
-  const email = document.getElementById('log-email').value;
-  const password = document.getElementById('log-password').value;
+  const email = getValue('log-email');
+  const password = getValue('log-password');
 
   const { error } = await supabaseClient.auth.signInWithPassword({
     email,
     password
   });
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+  if (handleError(error)) return;
 
-  loadApp();
+  await loadApp();
 }
 
 async function logoutUser() {
@@ -44,7 +43,7 @@ async function logoutUser() {
 }
 
 // ======================
-// APP INIT
+// INIT APP
 // ======================
 
 async function loadApp() {
@@ -53,125 +52,263 @@ async function loadApp() {
 
   if (!user) return;
 
-  document.getElementById('auth-box').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
+  toggleUI(true);
 
   document.getElementById('utente-email').innerText = user.email;
 
-  caricaStorico();
+  await caricaStorico();
 }
 
 // ======================
-// SALVATAGGIO BOLLETTA
+// SAVE BOLLETTA
 // ======================
 
 async function salvaBolletta() {
 
   const { data: { user } } = await supabaseClient.auth.getUser();
 
-  const bolletta = {
-    user_id: user.id,
-    tipo: document.getElementById('tipo').value,
-    periodo_dal: document.getElementById('periodo_dal').value,
-    periodo_al: document.getElementById('periodo_al').value,
-    consumi: parseFloat(document.getElementById('consumi').value),
-    importo: parseFloat(document.getElementById('importo').value),
-    tariffa: parseFloat(document.getElementById('tariffa').value) || null,
-    quota: parseFloat(document.getElementById('quota').value) || null,
-    fornitore: document.getElementById('fornitore').value,
-    mercato: document.getElementById('mercato').value,
-    pod_pdr: document.getElementById('pod_pdr').value,
-    note: document.getElementById('note').value
-  };
+  const bolletta = buildBolletta(user.id);
 
   const { error } = await supabaseClient
     .from('bollette')
     .insert([bolletta]);
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+  if (handleError(error, 'Bolletta salvata correttamente')) return;
 
-  alert('Bolletta salvata correttamente');
-
-  caricaStorico();
+  await caricaStorico();
 }
 
 // ======================
-// STORICO + KPI + GRAFICO
+// LOAD + FILTER ENGINE
 // ======================
 
-let chartInstance = null;
-
 async function caricaStorico() {
-
-  const storico = document.getElementById('storico');
-  storico.innerHTML = '';
 
   const { data, error } = await supabaseClient
     .from('bollette')
     .select('*');
 
-  if (error) {
-    alert(error.message);
-    return;
+  if (handleError(error)) return;
+
+  bolletteCache = data || [];
+
+  const filtered = applyFilters(bolletteCache);
+
+  renderStorico(filtered);
+  renderDashboard(filtered);
+  updateFilterOptions(bolletteCache);
+}
+
+// ======================
+// FILTER ENGINE
+// ======================
+
+function applyFilters(data) {
+
+  const anno = getValue('filter-anno');
+  const fornitore = getValue('filter-fornitore');
+  const tipo = getValue('filter-tipo');
+
+  let result = data;
+
+  if (anno) {
+    result = result.filter(b =>
+      (b.periodo_al || '').includes(anno)
+    );
   }
 
-  let totaleSpesa = 0;
-  let totaleConsumi = 0;
+  if (fornitore) {
+    result = result.filter(b =>
+      b.fornitore === fornitore
+    );
+  }
 
-  const labels = [];
-  const valori = [];
+  if (tipo) {
+    result = result.filter(b =>
+      b.tipo === tipo
+    );
+  }
+
+  return result;
+}
+
+// ======================
+// RENDER STORICO
+// ======================
+
+function renderStorico(data) {
+
+  const storico = document.getElementById('storico');
+  storico.innerHTML = '';
 
   data.forEach(b => {
 
-    totaleSpesa += Number(b.importo || 0);
-    totaleConsumi += Number(b.consumi || 0);
+    const item = document.createElement('div');
+    item.className = 'item-storico';
 
-    labels.push(b.periodo_al || '');
-    valori.push(b.importo || 0);
-
-    const div = document.createElement('div');
-    div.className = 'item-storico';
-    div.innerHTML = `
-      <strong>${b.tipo}</strong> - ${b.periodo_dal} / ${b.periodo_al}
-      <br>€ ${b.importo} | ${b.consumi} kWh
+    item.innerHTML = `
+      <strong>${b.tipo || '-'}</strong><br>
+      ${b.periodo_dal || ''} → ${b.periodo_al || ''}<br>
+      💶 € ${format(b.importo)} | ⚡ ${format(b.consumi)} kWh
     `;
-    storico.appendChild(div);
+
+    storico.appendChild(item);
   });
+}
 
-  // ======================
-  // KPI
-  // ======================
+// ======================
+// DASHBOARD (KPI + GRAFICO)
+// ======================
 
-  document.getElementById('kpi-spesa').innerText =
-    '€ ' + totaleSpesa.toFixed(2);
+function renderDashboard(data) {
 
-  document.getElementById('kpi-consumi').innerText =
-    totaleConsumi.toFixed(0);
+  const stats = calculateStats(data);
 
-  document.getElementById('kpi-media').innerText =
-    '€ ' + (totaleSpesa / (totaleConsumi || 1)).toFixed(3);
+  setText('kpi-spesa', `€ ${stats.totaleSpesa}`);
+  setText('kpi-consumi', stats.totaleConsumi);
+  setText('kpi-media', `€ ${stats.mediaKwh}`);
 
-  // ======================
-  // GRAFICO
-  // ======================
+  renderChart(data);
+}
+
+// ======================
+// CHART
+// ======================
+
+function renderChart(data) {
+
+  const labels = data.map(b => b.periodo_al || '');
+  const values = data.map(b => b.importo || 0);
 
   const ctx = document.getElementById('graficoSpesa');
 
-  if (chartInstance) {
-    chartInstance.destroy();
-  }
+  if (chartInstance) chartInstance.destroy();
 
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels.reverse(),
+      labels,
       datasets: [{
         label: 'Spesa €',
-        data: valori.reverse()
+        data: values
       }]
     }
   });
+}
+
+// ======================
+// ANALYTICS ENGINE
+// ======================
+
+function calculateStats(data) {
+
+  let totaleSpesa = 0;
+  let totaleConsumi = 0;
+
+  data.forEach(b => {
+    totaleSpesa += Number(b.importo || 0);
+    totaleConsumi += Number(b.consumi || 0);
+  });
+
+  return {
+    totaleSpesa: totaleSpesa.toFixed(2),
+    totaleConsumi: totaleConsumi.toFixed(0),
+    mediaKwh: (totaleSpesa / (totaleConsumi || 1)).toFixed(3)
+  };
+}
+
+// ======================
+// FILTER OPTIONS AUTO
+// ======================
+
+function updateFilterOptions(data) {
+
+  const anni = new Set();
+  const fornitori = new Set();
+
+  data.forEach(b => {
+
+    if (b.periodo_al)
+      anni.add(b.periodo_al.slice(0, 4));
+
+    if (b.fornitore)
+      fornitori.add(b.fornitore);
+  });
+
+  fillSelect('filter-anno', anni);
+  fillSelect('filter-fornitore', fornitori);
+}
+
+function fillSelect(id, values) {
+
+  const select = document.getElementById(id);
+
+  if (!select) return;
+
+  if (select.options.length > 1) return;
+
+  values.forEach(v => {
+
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.innerText = v;
+    select.appendChild(opt);
+  });
+}
+
+// ======================
+// BUILD OBJECT
+// ======================
+
+function buildBolletta(userId) {
+
+  return {
+    user_id: userId,
+    tipo: getValue('tipo'),
+    periodo_dal: getValue('periodo_dal'),
+    periodo_al: getValue('periodo_al'),
+    consumi: toNumber('consumi'),
+    importo: toNumber('importo'),
+    tariffa: toNumber('tariffa', true),
+    quota: toNumber('quota', true),
+    fornitore: getValue('fornitore'),
+    mercato: getValue('mercato'),
+    pod_pdr: getValue('pod_pdr'),
+    note: getValue('note')
+  };
+}
+
+// ======================
+// HELPERS
+// ======================
+
+function getValue(id) {
+  return document.getElementById(id)?.value || '';
+}
+
+function toNumber(id, nullable = false) {
+  const val = parseFloat(document.getElementById(id)?.value);
+  return isNaN(val) ? (nullable ? null : 0) : val;
+}
+
+function setText(id, value) {
+  document.getElementById(id).innerText = value;
+}
+
+function format(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function toggleUI(isLogged) {
+  document.getElementById('auth-box').style.display = isLogged ? 'none' : 'block';
+  document.getElementById('app').style.display = isLogged ? 'block' : 'none';
+}
+
+function handleError(error, successMsg = null) {
+  if (error) {
+    alert(error.message);
+    return true;
+  }
+  if (successMsg) alert(successMsg);
+  return false;
 }
