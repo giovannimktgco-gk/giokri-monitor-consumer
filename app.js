@@ -1,917 +1,489 @@
-// ======================
-// GIOKRI MONITOR
-// VERSIONE COMPLETA
-// ======================
+<!-- ====================== -->
+<!-- GIOKRI MONITOR -->
+<!-- INDEX.HTML COMPLETO -->
+<!-- ====================== -->
 
-// ======================
-// STATE
-// ======================
+<!DOCTYPE html>
 
-let chartInstance = null;
-let bolletteCache = [];
+<html lang="it">
 
-// ======================
-// AUTH
-// ======================
+<head>
 
-async function registerUser() {
+  <meta charset="UTF-8">
 
-  const email = getValue('reg-email');
-  const password = getValue('reg-password');
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  const { error } =
-    await supabaseClient.auth.signUp({
-      email,
-      password
-    });
+  <title>
+    GiOKri Monitor
+  </title>
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
-  alert('Registrazione completata');
-}
+  <!-- CHART -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-async function loginUser() {
+  <style>
 
-  const email = getValue('log-email');
-  const password = getValue('log-password');
-
-  const { error } =
-    await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  await loadApp();
-}
-
-async function logoutUser() {
-
-  await supabaseClient.auth.signOut();
-
-  location.reload();
-}
-
-// ======================
-// INIT
-// ======================
-
-async function loadApp() {
-
-  const {
-    data: { user }
-  } = await supabaseClient.auth.getUser();
-
-  if (!user) return;
-
-  toggleUI(true);
-
-  setTextSafe(
-    'utente-email',
-    user.email
-  );
-
-  await caricaStorico();
-}
-
-// ======================
-// SAVE BOLLETTA
-// ======================
-
-async function salvaBolletta() {
-
-  const {
-    data: { user }
-  } = await supabaseClient.auth.getUser();
-
-  if (!user) {
-    alert('Utente non autenticato');
-    return;
-  }
-
-  const bolletta =
-    buildBolletta(user.id);
-
-  const { error } =
-    await supabaseClient
-      .from('bollette')
-      .insert([bolletta]);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  alert('Bolletta salvata correttamente');
-
-  await caricaStorico();
-}
-
-// ======================
-// BUILD OBJECT
-// ======================
-
-function buildBolletta(userId) {
-
-  return {
-
-    user_id: userId,
-
-    tipo:
-      getValue('tipo'),
-
-    periodo_dal:
-      getValue('periodo_dal'),
-
-    periodo_al:
-      getValue('periodo_al'),
-
-    consumi:
-      parseFloat(
-        getValue('consumi')
-      ) || 0,
-
-    importo:
-      parseFloat(
-        getValue('importo')
-      ) || 0,
-
-    tariffa:
-      parseFloat(
-        getValue('tariffa')
-      ) || 0,
-
-    // 🔥 FISSA / INDICIZZATA
-    tariffa_tipo:
-      getValue('tariffa_tipo'),
-
-    quota:
-      parseFloat(
-        getValue('quota')
-      ) || 0,
-
-    fornitore:
-      getValue('fornitore'),
-
-    mercato:
-      getValue('mercato'),
-
-    pod_pdr:
-      getValue('pod_pdr'),
-
-    note:
-      getValue('note')
-  };
-}
-
-// ======================
-// LOAD DATA
-// ======================
-
-async function caricaStorico() {
-
-  const { data, error } =
-    await supabaseClient
-      .from('bollette')
-      .select('*')
-      .order('periodo_al', {
-        ascending: true
-      });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  bolletteCache =
-    normalizeData(data || []);
-
-  const filtered =
-    applyFilters(bolletteCache);
-
-  renderStorico(filtered);
-
-  renderDashboard(filtered);
-
-  updateFilterOptions(
-    bolletteCache
-  );
-}
-
-// ======================
-// NORMALIZE
-// ======================
-
-function normalizeData(data) {
-
-  return data.map(b => ({
-
-    ...b,
-
-    tariffa_tipo:
-      b.tariffa_tipo ||
-      'NON SPECIFICATO'
-  }));
-}
-
-// ======================
-// FILTERS
-// ======================
-
-function applyFilters(data) {
-
-  const anno =
-    getValue('filter-anno');
-
-  const fornitore =
-    getValue('filter-fornitore');
-
-  const tipo =
-    getValue('filter-tipo');
-
-  let result = [...data];
-
-  if (anno) {
-
-    result =
-      result.filter(b =>
-        (b.periodo_al || '')
-          .includes(anno)
-      );
-  }
-
-  if (fornitore) {
-
-    result =
-      result.filter(b =>
-        b.fornitore ===
-        fornitore
-      );
-  }
-
-  if (tipo) {
-
-    result =
-      result.filter(b =>
-        b.tipo === tipo
-      );
-  }
-
-  return result;
-}
-
-// ======================
-// STORICO
-// ======================
-
-function renderStorico(data) {
-
-  const container =
-    document.getElementById(
-      'storico'
-    );
-
-  if (!container) return;
-
-  container.innerHTML = '';
-
-  data.forEach(b => {
-
-    const div =
-      document.createElement('div');
-
-    div.className =
-      'item-storico';
-
-    div.innerHTML = `
-
-      <strong>
-        ${b.tipo || '-'}
-      </strong>
-
-      <br>
-
-      🧾 Tariffa:
-      <b>
-        ${b.tariffa_tipo}
-      </b>
-
-      <br>
-
-      📅
-      ${b.periodo_dal || ''}
-      →
-      ${b.periodo_al || ''}
-
-      <br>
-
-      ⚡
-      € ${format(b.importo)}
-      |
-      ${format(b.consumi)}
-      kWh
-
-      <br>
-
-      💡 €/kWh:
-      ${format4(b.tariffa)}
-
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-// ======================
-// DASHBOARD
-// ======================
-
-function renderDashboard(data) {
-
-  if (!data.length) {
-
-    resetKPI();
-
-    renderAlerts([]);
-
-    return;
-  }
-
-  const grouped =
-    groupByMonth(data);
-
-  const months =
-    Object.keys(grouped).sort();
-
-  if (months.length < 1)
-    return;
-
-  const currentKey =
-    months[months.length - 1];
-
-  const prevKey =
-    months[months.length - 2]
-    || currentKey;
-
-  const curr =
-    grouped[currentKey] || [];
-
-  const prev =
-    grouped[prevKey] || [];
-
-  const statsCurr =
-    calculateStats(curr);
-
-  const statsPrev =
-    calculateStats(prev);
-
-  // ======================
-  // KPI
-  // ======================
-
-  setKPI(
-    'kpi-spesa',
-    'Spesa',
-    statsCurr.totaleSpesa,
-    statsPrev.totaleSpesa,
-    currentKey,
-    '€'
-  );
-
-  setKPI(
-    'kpi-consumi',
-    'Consumi',
-    statsCurr.totaleConsumi,
-    statsPrev.totaleConsumi,
-    currentKey,
-    'kWh'
-  );
-
-  setKPI(
-    'kpi-media',
-    'Costo medio',
-    statsCurr.mediaKwh,
-    statsPrev.mediaKwh,
-    currentKey,
-    '€/kWh'
-  );
-
-  // 🔥 KPI TARIFFA
-  setKPI(
-    'kpi-tariffa',
-    'Tariffa media',
-    statsCurr.tariffaMedia,
-    statsPrev.tariffaMedia,
-    currentKey,
-    '€/kWh'
-  );
-
-  // ======================
-  // ALERT
-  // ======================
-
-  const alerts =
-    generateAlerts(
-      statsCurr,
-      statsPrev,
-      curr
-    );
-
-  renderAlerts(alerts);
-
-  // ======================
-  // CHART
-  // ======================
-
-  renderChartMonthly(
-    grouped
-  );
-}
-
-// ======================
-// KPI ENGINE
-// ======================
-
-function setKPI(
-  id,
-  label,
-  current,
-  previous,
-  period,
-  suffix = ''
-) {
-
-  const el =
-    document.getElementById(id);
-
-  if (!el) return;
-
-  const curr =
-    Number(current || 0);
-
-  const prev =
-    Number(previous || 0);
-
-  const variation =
-    percent(curr, prev);
-
-  const icon =
-    variation > 0
-      ? '↑'
-      : variation < 0
-      ? '↓'
-      : '→';
-
-  const color =
-    variation > 10
-      ? 'red'
-      : variation < -10
-      ? 'green'
-      : 'orange';
-
-  el.innerHTML = `
-
-    <div
-      style="
-        font-size:12px;
-        color:#666;
-      "
-    >
-      ${label}
-      <br>
-      ${period}
-    </div>
-
-    <div
-      style="
-        font-size:24px;
-        font-weight:bold;
-      "
-    >
-      ${curr.toFixed(4)}
-      ${suffix}
-    </div>
-
-    <div
-      style="
-        font-size:12px;
-        color:${color};
-      "
-    >
-      ${icon}
-      ${variation.toFixed(1)}%
-      vs mese precedente
-    </div>
-
-  `;
-}
-
-// ======================
-// ALERT ENGINE
-// ======================
-
-function generateAlerts(
-  curr,
-  prev,
-  currData
-) {
-
-  const alerts = [];
-
-  const spesaVar =
-    percent(
-      curr.totaleSpesa,
-      prev.totaleSpesa
-    );
-
-  const tariffaVar =
-    percent(
-      curr.tariffaMedia,
-      prev.tariffaMedia
-    );
-
-  if (spesaVar > 10) {
-
-    alerts.push({
-
-      type: 'danger',
-
-      title:
-        'Aumento spesa',
-
-      message:
-        `Spesa aumentata del ${spesaVar.toFixed(1)}%`
-    });
-  }
-
-  if (tariffaVar > 5) {
-
-    alerts.push({
-
-      type: 'warning',
-
-      title:
-        'Tariffa peggiorata',
-
-      message:
-        `Tariffa aumentata del ${tariffaVar.toFixed(1)}%`
-    });
-  }
-
-  const indicizzate =
-    currData.filter(
-      b =>
-        b.tariffa_tipo ===
-        'INDICIZZATA'
-    ).length;
-
-  if (
-    currData.length &&
-    indicizzate /
-      currData.length > 0.6
-  ) {
-
-    alerts.push({
-
-      type: 'warning',
-
-      title:
-        'Alta esposizione indicizzata',
-
-      message:
-        'Più del 60% delle bollette è indicizzato'
-    });
-  }
-
-  return alerts;
-}
-
-// ======================
-// ALERT UI
-// ======================
-
-function renderAlerts(alerts) {
-
-  const el =
-    document.getElementById(
-      'alerts'
-    );
-
-  if (!el) return;
-
-  if (!alerts.length) {
-
-    el.innerHTML = `
-      <div class="alert ok">
-        Nessuna anomalia rilevata
-      </div>
-    `;
-
-    return;
-  }
-
-  el.innerHTML =
-    alerts.map(a => `
-
-      <div class="alert ${a.type}">
-
-        <strong>
-          ${a.title}
-        </strong>
-
-        <br>
-
-        ${a.message}
-
-      </div>
-
-    `).join('');
-}
-
-// ======================
-// GROUP BY MONTH
-// ======================
-
-function groupByMonth(data) {
-
-  const groups = {};
-
-  data.forEach(b => {
-
-    const key =
-      (b.periodo_al || '')
-        .slice(0, 7);
-
-    if (!groups[key]) {
-
-      groups[key] = [];
+    body{
+      font-family:Arial;
+      background:#f4f6f9;
+      margin:0;
+      padding:20px;
     }
 
-    groups[key].push(b);
-  });
-
-  return groups;
-}
-
-// ======================
-// STATS
-// ======================
-
-function calculateStats(data) {
-
-  let spesa = 0;
-  let consumi = 0;
-  let tariffaTot = 0;
-  let tariffaCount = 0;
-
-  data.forEach(b => {
-
-    spesa +=
-      Number(b.importo || 0);
-
-    consumi +=
-      Number(b.consumi || 0);
-
-    if (b.tariffa) {
-
-      tariffaTot +=
-        Number(b.tariffa);
-
-      tariffaCount++;
+    h1,h2,h3{
+      margin-top:0;
     }
-  });
 
-  return {
+    .box{
+      background:#fff;
+      padding:20px;
+      border-radius:10px;
+      margin-bottom:20px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    }
 
-    totaleSpesa:
-      spesa,
+    input,
+    select,
+    textarea,
+    button{
+      width:100%;
+      padding:10px;
+      margin-top:8px;
+      margin-bottom:15px;
+      border:1px solid #ccc;
+      border-radius:6px;
+      box-sizing:border-box;
+    }
 
-    totaleConsumi:
-      consumi,
+    button{
+      background:#1d4ed8;
+      color:white;
+      border:none;
+      cursor:pointer;
+      font-weight:bold;
+    }
 
-    mediaKwh:
-      spesa /
-      (consumi || 1),
+    button:hover{
+      opacity:0.9;
+    }
 
-    tariffaMedia:
-      tariffaCount
-        ? tariffaTot /
-          tariffaCount
-        : 0
-  };
-}
+    .dashboard-kpi{
+      display:grid;
+      grid-template-columns:
+        repeat(auto-fit,minmax(220px,1fr));
+      gap:15px;
+      margin-bottom:20px;
+    }
 
-// ======================
-// CHART
-// ======================
+    .kpi-card{
+      background:white;
+      border-radius:10px;
+      padding:15px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    }
 
-function renderChartMonthly(
-  grouped
-) {
+    .item-storico{
+      background:#fff;
+      padding:15px;
+      border-radius:8px;
+      margin-bottom:10px;
+      border-left:5px solid #1d4ed8;
+    }
 
-  const labels =
-    Object.keys(grouped).sort();
+    .alert{
+      padding:15px;
+      border-radius:8px;
+      margin-bottom:10px;
+      color:white;
+    }
 
-  const values =
-    labels.map(m => {
+    .danger{
+      background:#dc2626;
+    }
 
-      const stats =
-        calculateStats(
-          grouped[m]
-        );
+    .warning{
+      background:#f59e0b;
+    }
 
-      return stats.totaleSpesa;
-    });
+    .ok{
+      background:#16a34a;
+    }
 
-  const ctx =
-    document.getElementById(
-      'graficoSpesa'
-    );
+  </style>
 
-  if (!ctx) return;
+</head>
 
-  if (chartInstance) {
-    chartInstance.destroy();
-  }
+<body>
 
-  chartInstance =
-    new Chart(ctx, {
+  <!-- ====================== -->
+  <!-- LOGIN -->
+  <!-- ====================== -->
 
-      type: 'line',
+  <div
+    id="auth-box"
+    class="box"
+  >
 
-      data: {
+    <h2>
+      Login
+    </h2>
 
-        labels,
+    <input
+      id="log-email"
+      type="email"
+      placeholder="Email"
+    >
 
-        datasets: [{
+    <input
+      id="log-password"
+      type="password"
+      placeholder="Password"
+    >
 
-          label:
-            'Spesa mensile €',
+    <button onclick="loginUser()">
+      Accedi
+    </button>
 
-          data: values
-        }]
-      }
-    });
-}
+    <hr>
 
-// ======================
-// FILTER OPTIONS
-// ======================
+    <h3>
+      Registrazione
+    </h3>
 
-function updateFilterOptions(
-  data
-) {
+    <input
+      id="reg-email"
+      type="email"
+      placeholder="Email"
+    >
 
-  fillSelect(
-    'filter-anno',
+    <input
+      id="reg-password"
+      type="password"
+      placeholder="Password"
+    >
 
-    [...new Set(
-      data.map(
-        b =>
-          (b.periodo_al || '')
-            .slice(0, 4)
-      )
-    )]
-  );
+    <button onclick="registerUser()">
+      Registrati
+    </button>
 
-  fillSelect(
-    'filter-fornitore',
+  </div>
 
-    [...new Set(
-      data
-        .map(
-          b => b.fornitore
-        )
-        .filter(Boolean)
-    )]
-  );
-}
+  <!-- ====================== -->
+  <!-- APP -->
+  <!-- ====================== -->
 
-// ======================
-// FILL SELECT
-// ======================
+  <div
+    id="app"
+    style="display:none;"
+  >
 
-function fillSelect(
-  id,
-  values
-) {
+    <!-- ====================== -->
+    <!-- HEADER -->
+    <!-- ====================== -->
 
-  const el =
-    document.getElementById(id);
+    <div class="box">
 
-  if (!el) return;
+      <h1>
+        GiOKri Monitor
+      </h1>
 
-  const current =
-    el.value;
+      <p>
+        Utente:
+        <span id="utente-email"></span>
+      </p>
 
-  el.innerHTML =
-    '<option value="">Tutti</option>';
+      <button onclick="logoutUser()">
+        Logout
+      </button>
 
-  values.forEach(v => {
+    </div>
 
-    const opt =
-      document.createElement(
-        'option'
+    <!-- ====================== -->
+    <!-- FILTRI -->
+    <!-- ====================== -->
+
+    <div class="box">
+
+      <h2>
+        Filtri
+      </h2>
+
+      <select
+        id="filter-anno"
+        onchange="caricaStorico()"
+      >
+        <option value="">
+          Tutti gli anni
+        </option>
+      </select>
+
+      <select
+        id="filter-fornitore"
+        onchange="caricaStorico()"
+      >
+        <option value="">
+          Tutti i fornitori
+        </option>
+      </select>
+
+      <select
+        id="filter-tipo"
+        onchange="caricaStorico()"
+      >
+        <option value="">
+          Tutti i tipi
+        </option>
+
+        <option value="LUCE">
+          LUCE
+        </option>
+
+        <option value="GAS">
+          GAS
+        </option>
+      </select>
+
+    </div>
+
+    <!-- ====================== -->
+    <!-- KPI -->
+    <!-- ====================== -->
+
+    <div class="dashboard-kpi">
+
+      <div class="kpi-card">
+        <div id="kpi-spesa"></div>
+      </div>
+
+      <div class="kpi-card">
+        <div id="kpi-consumi"></div>
+      </div>
+
+      <div class="kpi-card">
+        <div id="kpi-media"></div>
+      </div>
+
+      <!-- 🔥 KPI TARIFFA -->
+      <div class="kpi-card">
+        <div id="kpi-tariffa"></div>
+      </div>
+
+    </div>
+
+    <!-- ====================== -->
+    <!-- ALERT -->
+    <!-- ====================== -->
+
+    <div
+      id="alerts"
+      class="box"
+    ></div>
+
+    <!-- ====================== -->
+    <!-- GRAFICO -->
+    <!-- ====================== -->
+
+    <div class="box">
+
+      <h2>
+        Andamento Spesa
+      </h2>
+
+      <canvas id="graficoSpesa"></canvas>
+
+    </div>
+
+    <!-- ====================== -->
+    <!-- FORM BOLLETTA -->
+    <!-- ====================== -->
+
+    <div class="box">
+
+      <h2>
+        Inserisci Bolletta
+      </h2>
+
+      <select id="tipo">
+
+        <option value="LUCE">
+          LUCE
+        </option>
+
+        <option value="GAS">
+          GAS
+        </option>
+
+      </select>
+
+      <label>
+        Periodo Dal
+      </label>
+
+      <input
+        type="date"
+        id="periodo_dal"
+      >
+
+      <label>
+        Periodo Al
+      </label>
+
+      <input
+        type="date"
+        id="periodo_al"
+      >
+
+      <label>
+        Consumi
+      </label>
+
+      <input
+        type="number"
+        id="consumi"
+      >
+
+      <label>
+        Importo €
+      </label>
+
+      <input
+        type="number"
+        step="0.01"
+        id="importo"
+      >
+
+      <label>
+        Tariffa €/kWh o Smc
+      </label>
+
+      <input
+        type="number"
+        step="0.0001"
+        id="tariffa"
+      >
+
+      <!-- 🔥 TARIFFA TIPO -->
+
+      <label>
+        Tipo Tariffa
+      </label>
+
+      <select id="tariffa_tipo">
+
+        <option value="">
+          Seleziona
+        </option>
+
+        <option value="FISSA">
+          Fissa
+        </option>
+
+        <option value="INDICIZZATA">
+          Indicizzata
+        </option>
+
+      </select>
+
+      <label>
+        Quota Fissa €
+      </label>
+
+      <input
+        type="number"
+        step="0.01"
+        id="quota"
+      >
+
+      <label>
+        Fornitore
+      </label>
+
+      <input
+        type="text"
+        id="fornitore"
+      >
+
+      <label>
+        Mercato
+      </label>
+
+      <select id="mercato">
+
+        <option value="LIBERO">
+          Libero
+        </option>
+
+        <option value="TUTELATO">
+          Tutelato
+        </option>
+
+      </select>
+
+      <label>
+        POD / PDR
+      </label>
+
+      <input
+        type="text"
+        id="pod_pdr"
+      >
+
+      <label>
+        Note
+      </label>
+
+      <textarea id="note"></textarea>
+
+      <button onclick="salvaBolletta()">
+        Salva Bolletta
+      </button>
+
+    </div>
+
+    <!-- ====================== -->
+    <!-- STORICO -->
+    <!-- ====================== -->
+
+    <div class="box">
+
+      <h2>
+        Storico Bollette
+      </h2>
+
+      <div id="storico"></div>
+
+    </div>
+
+  </div>
+
+  <!-- ====================== -->
+  <!-- CONFIG SUPABASE -->
+  <!-- ====================== -->
+
+  <script>
+
+    const SUPABASE_URL =
+      'INSERISCI_URL';
+
+    const SUPABASE_KEY =
+      'INSERISCI_ANON_KEY';
+
+    const supabaseClient =
+      supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
       );
 
-    opt.value = v;
-    opt.textContent = v;
+  </script>
 
-    el.appendChild(opt);
-  });
+  <!-- APP JS -->
+  <script src="app.js"></script>
 
-  el.value = current;
-}
+</body>
 
-// ======================
-// HELPERS
-// ======================
-
-function percent(a, b) {
-
-  a = Number(a || 0);
-  b = Number(b || 0);
-
-  if (b === 0) return 0;
-
-  return ((a - b) / b) * 100;
-}
-
-function getValue(id) {
-
-  return document
-    .getElementById(id)
-    ?.value || '';
-}
-
-function setTextSafe(
-  id,
-  value
-) {
-
-  const el =
-    document.getElementById(id);
-
-  if (el) {
-    el.innerText = value;
-  }
-}
-
-function format(v) {
-
-  return Number(v || 0)
-    .toFixed(2);
-}
-
-function format4(v) {
-
-  return Number(v || 0)
-    .toFixed(4);
-}
-
-function toggleUI(isLogged) {
-
-  document.getElementById(
-    'auth-box'
-  ).style.display =
-    isLogged
-      ? 'none'
-      : 'block';
-
-  document.getElementById(
-    'app'
-  ).style.display =
-    isLogged
-      ? 'block'
-      : 'none';
-}
-
-function resetKPI() {
-
-  setTextSafe(
-    'kpi-spesa',
-    '0'
-  );
-
-  setTextSafe(
-    'kpi-consumi',
-    '0'
-  );
-
-  setTextSafe(
-    'kpi-media',
-    '0'
-  );
-
-  setTextSafe(
-    'kpi-tariffa',
-    '0'
-  );
-}
+</html>
