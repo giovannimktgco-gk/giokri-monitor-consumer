@@ -45,7 +45,7 @@ async function logoutUser() {
 }
 
 // ======================
-// INIT APP
+// INIT
 // ======================
 
 async function loadApp() {
@@ -56,24 +56,20 @@ async function loadApp() {
 
   toggleUI(true);
 
-  const emailEl = document.getElementById('utente-email');
-  if (emailEl) emailEl.innerText = user.email;
+  setTextSafe('utente-email', user.email);
 
   await caricaStorico();
 }
 
 // ======================
-// SAVE BOLLETTA
+// SAVE
 // ======================
 
 async function salvaBolletta() {
 
   const { data: { user } } = await supabaseClient.auth.getUser();
 
-  if (!user) {
-    alert("Utente non autenticato");
-    return;
-  }
+  if (!user) return alert("Utente non autenticato");
 
   const bolletta = buildBolletta(user.id);
 
@@ -110,7 +106,7 @@ async function caricaStorico() {
 }
 
 // ======================
-// FILTERS
+// FILTER ENGINE
 // ======================
 
 function applyFilters(data) {
@@ -143,7 +139,7 @@ function applyFilters(data) {
 }
 
 // ======================
-// RENDER STORICO
+// STORICO
 // ======================
 
 function renderStorico(data) {
@@ -169,20 +165,132 @@ function renderStorico(data) {
 }
 
 // ======================
-// DASHBOARD KPI + CHART
+// DASHBOARD (CORE INTELLIGENCE)
 // ======================
 
 function renderDashboard(data) {
 
-  if (!data) data = [];
+  if (!data || data.length === 0) {
+    resetKPI();
+    return;
+  }
 
-  const stats = calculateStats(data);
+  // =========================
+  // GROUP BY MONTH (REAL)
+  // =========================
 
-  setTextSafe('kpi-spesa', `€ ${stats.totaleSpesa}`);
-  setTextSafe('kpi-consumi', stats.totaleConsumi);
-  setTextSafe('kpi-media', `€ ${stats.mediaKwh}`);
+  const grouped = groupByMonth(data);
+
+  const months = Object.keys(grouped).sort();
+
+  if (months.length < 2) {
+    renderBasicKPI(data);
+    return;
+  }
+
+  const lastMonth = grouped[months[months.length - 1]];
+  const prevMonth = grouped[months[months.length - 2]];
+
+  const statsCurr = calculateStats(lastMonth);
+  const statsPrev = calculateStats(prevMonth);
+
+  // =========================
+  // KPI EVOLUTION
+  // =========================
+
+  setKPI('kpi-spesa', statsCurr.totaleSpesa, statsPrev.totaleSpesa, '€');
+  setKPI('kpi-consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, '');
+  setKPI('kpi-media', statsCurr.mediaKwh, statsPrev.mediaKwh, '€');
+
+  // =========================
+  // ALERT LOGIC
+  // =========================
+
+  generateAlerts(statsCurr, statsPrev);
 
   renderChart(data);
+}
+
+// ======================
+// GROUP BY MONTH ENGINE
+// ======================
+
+function groupByMonth(data) {
+
+  const groups = {};
+
+  data.forEach(b => {
+
+    const key = (b.periodo_al || '').slice(0, 7); // YYYY-MM
+
+    if (!groups[key]) groups[key] = [];
+
+    groups[key].push(b);
+  });
+
+  return groups;
+}
+
+// ======================
+// KPI ENGINE
+// ======================
+
+function setKPI(id, current, previous, prefix = '') {
+
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const curr = Number(current);
+  const prev = Number(previous || 0);
+
+  let variation = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+
+  const icon =
+    variation > 0 ? '↑' :
+    variation < 0 ? '↓' : '→';
+
+  const color =
+    variation > 10 ? 'red' :
+    variation < -10 ? 'green' : 'orange';
+
+  el.innerHTML = `
+    <div style="font-size:22px; font-weight:bold;">
+      ${prefix} ${curr.toFixed(2)}
+    </div>
+    <div style="font-size:12px; color:${color}; margin-top:4px;">
+      ${icon} ${variation.toFixed(1)}% vs mese precedente
+    </div>
+  `;
+}
+
+// ======================
+// ALERT ENGINE
+// ======================
+
+function generateAlerts(curr, prev) {
+
+  const spesaDiff = ((curr.totaleSpesa - prev.totaleSpesa) / (prev.totaleSpesa || 1)) * 100;
+
+  if (spesaDiff > 15) {
+    console.warn("⚠ ALERT: aumento spesa significativo");
+    showAlert("⚠ ATTENZIONE: aumento spesa > 15%");
+  }
+}
+
+function showAlert(msg) {
+
+  let box = document.getElementById('alert-box');
+
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'alert-box';
+    box.style.padding = '10px';
+    box.style.background = '#ffdddd';
+    box.style.color = '#900';
+    document.getElementById('app').prepend(box);
+  }
+
+  box.innerText = msg;
 }
 
 // ======================
@@ -194,17 +302,24 @@ function renderChart(data) {
   const ctx = document.getElementById('graficoSpesa');
   if (!ctx) return;
 
-  const labels = data.map(b => b.periodo_al || '');
-  const values = data.map(b => b.importo || 0);
+  const grouped = groupByMonth(data);
+
+  const labels = Object.keys(grouped).sort();
+
+  const values = labels.map(m => {
+
+    const stats = calculateStats(grouped[m]);
+    return stats.totaleSpesa;
+  });
 
   if (chartInstance) chartInstance.destroy();
 
   chartInstance = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels,
       datasets: [{
-        label: 'Spesa €',
+        label: 'Spesa mensile €',
         data: values
       }]
     }
@@ -212,7 +327,7 @@ function renderChart(data) {
 }
 
 // ======================
-// STATS ENGINE
+// STATS
 // ======================
 
 function calculateStats(data) {
@@ -288,7 +403,7 @@ function buildBolletta(userId) {
 }
 
 // ======================
-// HELPERS SAFE
+// HELPERS
 // ======================
 
 function getValue(id) {
@@ -310,9 +425,12 @@ function format(v) {
 }
 
 function toggleUI(isLogged) {
-  const auth = document.getElementById('auth-box');
-  const app = document.getElementById('app');
+  document.getElementById('auth-box').style.display = isLogged ? 'none' : 'block';
+  document.getElementById('app').style.display = isLogged ? 'block' : 'none';
+}
 
-  if (auth) auth.style.display = isLogged ? 'none' : 'block';
-  if (app) app.style.display = isLogged ? 'block' : 'none';
+function resetKPI() {
+  setTextSafe('kpi-spesa', '€ 0.00');
+  setTextSafe('kpi-consumi', '0');
+  setTextSafe('kpi-media', '€ 0.000');
 }
