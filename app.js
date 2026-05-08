@@ -46,7 +46,7 @@ async function logoutUser() {
 }
 
 // ======================
-// INIT
+// INIT APP
 // ======================
 
 async function loadApp() {
@@ -56,7 +56,6 @@ async function loadApp() {
   if (!user) return;
 
   toggleUI(true);
-
   setTextSafe('utente-email', user.email);
 
   await caricaStorico();
@@ -99,7 +98,7 @@ async function caricaStorico() {
 
   bolletteCache = data || [];
 
-  const filtered = applyFilters(bollettaCacheFix(bolletteCache));
+  const filtered = applyFilters(normalizeData(bolletteCache));
 
   renderStorico(filtered);
   renderDashboard(filtered);
@@ -107,10 +106,11 @@ async function caricaStorico() {
 }
 
 // ======================
-// FIX CONSISTENZA DATI
+// NORMALIZZAZIONE DATI
 // ======================
 
-function bollettaCacheFix(data) {
+function normalizeData(data) {
+
   return data.map(b => ({
     ...b,
     tariffa_tipo: b.tariffa_tipo || 'NON SPECIFICATO'
@@ -151,7 +151,7 @@ function applyFilters(data) {
 }
 
 // ======================
-// STORICO (ORA MOSTRA TIPO TARIFFA SICURO)
+// STORICO (MOSTRA TIPO TARIFFA)
 // ======================
 
 function renderStorico(data) {
@@ -178,7 +178,7 @@ function renderStorico(data) {
 }
 
 // ======================
-// DASHBOARD
+// DASHBOARD CORE
 // ======================
 
 function renderDashboard(data) {
@@ -214,6 +214,8 @@ function renderDashboard(data) {
   setKPI('kpi-spesa', 'Spesa', statsCurr.totaleSpesa, statsPrev.totaleSpesa, currentKey);
   setKPI('kpi-consumi', 'Consumi', statsCurr.totaleConsumi, statsPrev.totaleConsumi, currentKey);
   setKPI('kpi-media', 'Costo medio', statsCurr.mediaKwh, statsPrev.mediaKwh, currentKey);
+
+  // 🔥 KPI TARIFFA (QUESTO È QUELLO CHE TI MANCAVA)
   setKPI('kpi-tariffa', 'Tariffa €/kWh-Smc', statsCurr.tariffaMedia, statsPrev.tariffaMedia, currentKey);
 
   const alerts = generateAlerts(statsCurr, statsPrev, curr, prev);
@@ -226,7 +228,7 @@ function renderDashboard(data) {
 // ALERT ENGINE
 // ======================
 
-function generateAlerts(curr, prev, currData, prevData) {
+function generateAlerts(curr, prev, currData) {
 
   const alerts = [];
 
@@ -238,7 +240,7 @@ function generateAlerts(curr, prev, currData, prevData) {
     alerts.push({
       type: 'danger',
       title: 'Aumento spesa',
-      message: `Spesa +${spesaVar.toFixed(1)}% vs mese precedente`
+      message: `Spesa +${spesaVar.toFixed(1)}%`
     });
   }
 
@@ -259,22 +261,16 @@ function generateAlerts(curr, prev, currData, prevData) {
   }
 
   const indic = currData.filter(b => b.tariffa_tipo === 'INDICIZZATA').length;
+
   if (currData.length && indic / currData.length > 0.6) {
     alerts.push({
       type: 'warning',
-      title: 'Rischio volatilità',
+      title: 'Rischio volatilità prezzi',
       message: 'Oltre 60% contratti indicizzati'
     });
   }
 
   return alerts;
-}
-
-function percent(a, b) {
-  a = Number(a || 0);
-  b = Number(b || 0);
-  if (b === 0) return 0;
-  return ((a - b) / b) * 100;
 }
 
 // ======================
@@ -303,7 +299,7 @@ function setKPI(id, label, current, previous, period) {
 }
 
 // ======================
-// STATS
+// STATS ENGINE
 // ======================
 
 function calculateStats(data) {
@@ -314,6 +310,7 @@ function calculateStats(data) {
   let c = 0;
 
   data.forEach(b => {
+
     spesa += Number(b.importo || 0);
     cons += Number(b.consumi || 0);
 
@@ -332,29 +329,45 @@ function calculateStats(data) {
 }
 
 // ======================
-// ALERT UI
+// CHART
 // ======================
 
-function renderAlerts(alerts) {
+function renderChartMonthly(grouped) {
 
-  const el = document.getElementById('alerts');
-  if (!el) return;
+  const labels = Object.keys(grouped).sort();
 
-  if (!alerts.length) {
-    el.innerHTML = `<div class="alert ok">Nessuna anomalia rilevata</div>`;
-    return;
-  }
+  const values = labels.map(m => {
+    const stats = calculateStats(grouped[m]);
+    return stats.totaleSpesa;
+  });
 
-  el.innerHTML = alerts.map(a =>
-    `<div class="alert ${a.type}">
-      <b>${a.title}</b><br>${a.message}
-    </div>`
-  ).join('');
+  const ctx = document.getElementById('graficoSpesa');
+  if (!ctx) return;
+
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Spesa mensile €',
+        data: values
+      }]
+    }
+  });
 }
 
 // ======================
 // HELPERS
 // ======================
+
+function percent(a, b) {
+  a = Number(a || 0);
+  b = Number(b || 0);
+  if (b === 0) return 0;
+  return ((a - b) / b) * 100;
+}
 
 function getValue(id) {
   return document.getElementById(id)?.value || '';
